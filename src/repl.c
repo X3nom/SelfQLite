@@ -16,6 +16,37 @@ void check(int rc, sqlite3 *db) {
     }
 }
 
+
+// read string until ';' from stdin
+char *read_full_command(){
+    size_t m = 64;
+    char *cmd = malloc(m);
+    int len = 0;
+
+    char c;
+    for(;;){
+        c = getc(stdin);
+        
+        if(c == EOF){
+            free(cmd);
+            return NULL;
+        }
+
+        if(len - 1 >= m){
+            m *= 2;
+            cmd = realloc(cmd, m);
+        }
+
+        cmd[len++] = c;
+
+        if(c == ';') break;
+    }
+
+    cmd[len++] = '\0';
+
+    return cmd;
+}
+
 int run_repl(const char *filename) {
     sqlite3 *db = NULL;
     
@@ -34,14 +65,15 @@ int run_repl(const char *filename) {
 
     free(info);
     printf("SQLite REPL started (in-memory DB)\n");
+    printf("queries have to be ended with ';'\n");
 
-    char input[4096];
     while (1) {
         printf("sql> ");
-        if (!fgets(input, sizeof(input), stdin)) break;
+        char *cmd = read_full_command();
+        if (cmd == NULL) break;
 
         sqlite3_stmt *stmt = NULL;
-        rc = sqlite3_prepare_v2(db, input, -1, &stmt, NULL);
+        rc = sqlite3_prepare_v2(db, cmd, -1, &stmt, NULL);
         if (rc != SQLITE_OK) {
             fprintf(stderr, "Error: %s\n", sqlite3_errmsg(db));
             continue;
@@ -64,6 +96,7 @@ int run_repl(const char *filename) {
 
         update_db(filename, new_size, db_buffer);
         
+        free(cmd);
     }
 
     sqlite3_close(db);
